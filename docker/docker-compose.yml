@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+
+  cowrie:
+    image: cowrie/cowrie:latest
+    container_name: cowrie
+    restart: unless-stopped
+    ports:
+      - "22:2222"      # Kali attacks port 22 → Cowrie listens on 2222 inside
+      - "2222:2222"    # also expose 2222 directly for testing
+    volumes:
+      - ./cowrie.cfg:/cowrie/etc/cowrie.cfg:ro
+      - cowrie_logs:/cowrie/var/log/cowrie   # shared log volume
+    environment:
+      - COWRIE_TELNET_ENABLED=false
+    networks:
+      - honeypot_net
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: honeypot_backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - cowrie_logs:/cowrie_logs:ro   # read Cowrie logs from shared volume
+      - backend_data:/app/data
+    environment:
+      - COWRIE_LOG_PATH=/cowrie_logs/cowrie.json
+      - SQLITE_DB=/app/data/honeypot.db
+      - SECRET_KEY=change-this-in-production
+      - MONGO_URI=
+      - USE_AI_MODEL=false
+    networks:
+      - honeypot_net
+
+volumes:
+  cowrie_logs:
+  backend_data:
+
+networks:
+  honeypot_net:
+    driver: bridge
